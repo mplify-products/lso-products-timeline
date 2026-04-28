@@ -13,7 +13,7 @@
   :root {
     --mplify-navy:    #1f2c5c;
     --mplify-orange:  #f08c1f;
-    --year-2025:      #2f6fd1;   /* blue  band */
+    --year-2025:      #2f6fd1;   /* blue band */
     --year-2026:      #f08c1f;   /* orange band */
     --year-2027:      #6b2a8a;   /* purple band */
     --status-pub:     #1a8b3a;   /* Published */
@@ -78,6 +78,7 @@
   /* ---------- Timeline ---------- */
   #chartWrap {
     margin-top: 30px;
+    position: relative;        /* anchor for the hover layer */
   }
   svg.timeline {
     display: block;
@@ -85,6 +86,60 @@
     height: auto;
     overflow: visible;
   }
+
+  /* Hover popup overlay: rendered above the SVG, never clipped by foreignObject */
+  #hoverLayer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;      /* the layer itself is transparent to mouse;
+                                  only the popup inside it captures events */
+    z-index: 50;
+  }
+  #hoverLayer .popup {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow:
+      0 12px 32px rgba(31,44,92,0.22),
+      0 4px 10px rgba(31,44,92,0.10);
+    padding: 18px 22px;
+    font-family: 'Sansation', sans-serif;
+    transform-origin: center top;
+    animation: popupIn 160ms cubic-bezier(.2,.8,.2,1) both;
+    will-change: transform, opacity;
+  }
+  #hoverLayer .popup .name {
+    font-weight: 700;
+    font-size: 19px;          /* up from 12.5px */
+    color: var(--mplify-navy);
+    line-height: 1.25;
+    word-break: break-word;
+  }
+  #hoverLayer .popup .date {
+    margin-top: 8px;
+    font-weight: 400;
+    font-size: 14px;          /* up from 10.5px */
+    color: var(--ink-soft);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  /* Status accent band on the popup matches the card */
+  #hoverLayer .popup.status-Published    { border-left: 6px solid var(--status-pub); }
+  #hoverLayer .popup.status-InDevelopment{ border-left: 6px solid var(--status-dev); }
+  #hoverLayer .popup.status-Planned      { border-left: 6px solid var(--status-plan); }
+  #hoverLayer .popup.status-Area         { border-left: 6px solid var(--status-area); }
+  #hoverLayer .popup.status-default      { border-left: 6px solid var(--mplify-navy); }
+
+  @keyframes popupIn {
+    from { transform: translateY(6px) scale(0.92); opacity: 0; }
+    to   { transform: translateY(0)   scale(1);    opacity: 1; }
+  }
+
+  /* The original card fades slightly so the popup's identity is clear */
+  .callout.is-hovered { opacity: 0.35; transition: opacity 120ms; }
+  .callout { cursor: pointer; transition: opacity 120ms; }
 
   /* SVG text styling */
   .yr-label-inside {
@@ -156,6 +211,7 @@
   <div id="chartWrap">
     <div id="status" class="status-msg">Loading roadmap data…</div>
     <svg id="timeline" class="timeline" style="display:none"></svg>
+    <div id="hoverLayer" aria-hidden="true"></div>
   </div>
 </div>
 
@@ -390,22 +446,14 @@ function render(items) {
   });
 
   // Measure each card now (needed for tier-stacking math)
-  placed.forEach(p => {
+  placed.forEach((p, i) => {
     const safeName = escapeHtml(p.label);
     const safeDate = escapeHtml(dateLabel(p.date));
     p._safeName = safeName;
     p._safeDate = safeDate;
+    p._cardId   = 'card-' + i;
     p.cardH = measureCardHeight(safeName, safeDate, p.status);
   });
-
-  // ---- DEBUG: prove ETA logic is running with the live data ----
-  console.log('%c[Timeline ETA debug] Today:', 'color:#1f5fbf;font-weight:bold', today.toISOString().slice(0,10));
-  console.table(placed.map(p => ({
-    label: p.label.slice(0, 40),
-    rawDate: p.rawDate,
-    parsed: p.date.toISOString().slice(0,10),
-    rendered: p._safeDate,
-  })));
 
   document.body.removeChild(measurer);
 
@@ -561,7 +609,7 @@ function render(items) {
     const cardX = Math.max(margin.left - 30, Math.min(W - margin.right - cardW + 30, cx - cardW / 2));
     parts.push(`
       <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${p.cardH}">
-        <div xmlns="http://www.w3.org/1999/xhtml" class="callout status-${p.status}">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="callout status-${p.status}" data-card-id="${p._cardId}">
           <div class="name">${p._safeName}</div>
           <div class="date">${p._safeDate}</div>
         </div>
@@ -570,6 +618,116 @@ function render(items) {
   });
 
   svg.innerHTML = parts.join('\n');
+
+  // Wire up hover popups now that the SVG is in the DOM
+  setupHoverPopups(placed);
+}
+
+/* ============================================================
+   HOVER POPUPS
+   When the user hovers a callout card, render a larger duplicate
+   in the overlay layer. The original card stays in place (so
+   the layout doesn't shift) but fades back to make the popup
+   feel like the active element.
+   ============================================================ */
+function setupHoverPopups(placed) {
+  const wrap   = document.getElementById('chartWrap');
+  const layer  = document.getElementById('hoverLayer');
+  const cards  = document.querySelectorAll('.callout[data-card-id]');
+  const byId   = Object.fromEntries(placed.map(p => [p._cardId, p]));
+
+  const POPUP_W   = 280;        // larger than the card's 184px
+  const MARGIN    = 8;          // gap between popup edge and viewport
+
+  let activeId = null;
+
+  const showPopup = (cardEl) => {
+    const id = cardEl.getAttribute('data-card-id');
+    if (id === activeId) return;
+    hidePopup();
+    activeId = id;
+
+    const data = byId[id];
+    if (!data) return;
+
+    cardEl.classList.add('is-hovered');
+
+    // Build the popup
+    const popup = document.createElement('div');
+    popup.className = `popup status-${data.status}`;
+    popup.dataset.cardId = id;
+    popup.innerHTML = `
+      <div class="name">${data._safeName}</div>
+      <div class="date">${data._safeDate}</div>
+    `;
+
+    // Width is fixed; height is computed from content
+    popup.style.width = POPUP_W + 'px';
+    popup.style.left  = '0px';
+    popup.style.top   = '0px';
+    popup.style.visibility = 'hidden';   // hidden while we measure
+    layer.appendChild(popup);
+
+    // Now position relative to the original card (within #chartWrap coords)
+    const cardRect = cardEl.getBoundingClientRect();
+    const wrapRect = wrap.getBoundingClientRect();
+    const popupH   = popup.getBoundingClientRect().height;
+
+    // Center popup horizontally over the card, clamped to the wrapper
+    let left = (cardRect.left - wrapRect.left) + (cardRect.width / 2) - (POPUP_W / 2);
+    left = Math.max(MARGIN, Math.min(wrapRect.width - POPUP_W - MARGIN, left));
+
+    // Vertically: prefer the natural direction for this card (top-side cards pop up,
+    // bottom-side cards pop down) and fall back to the other direction if there's no room.
+    const cardTopInWrap = cardRect.top - wrapRect.top;
+    const cardBotInWrap = cardRect.bottom - wrapRect.top;
+    const gap = 10;
+    const prefersAbove = data.side === 'top';
+    const aboveTop = cardTopInWrap - popupH - gap;
+    const belowTop = cardBotInWrap + gap;
+    const aboveFits = aboveTop >= 0;
+    const belowFits = belowTop + popupH <= wrapRect.height;
+
+    let top;
+    if (prefersAbove && aboveFits)       top = aboveTop;
+    else if (!prefersAbove && belowFits) top = belowTop;
+    else if (aboveFits)                  top = aboveTop;
+    else if (belowFits)                  top = belowTop;
+    else                                 top = Math.max(0, aboveTop); // best effort
+
+    popup.style.left = left + 'px';
+    popup.style.top  = top  + 'px';
+    popup.style.visibility = 'visible';
+
+    // Hide popup when the user leaves both the card AND the popup
+    const onLeave = (e) => {
+      // If pointer moved into the popup, keep it open
+      const to = e.relatedTarget;
+      if (to && (popup.contains(to) || cardEl.contains(to))) return;
+      hidePopup();
+    };
+    cardEl.addEventListener('mouseleave', onLeave);
+    popup.addEventListener('mouseleave', onLeave);
+  };
+
+  const hidePopup = () => {
+    if (!activeId) return;
+    const oldCard  = document.querySelector(`.callout[data-card-id="${activeId}"]`);
+    const oldPopup = layer.querySelector(`.popup[data-card-id="${activeId}"]`);
+    if (oldCard)  oldCard.classList.remove('is-hovered');
+    if (oldPopup) oldPopup.remove();
+    activeId = null;
+  };
+
+  cards.forEach(cardEl => {
+    cardEl.addEventListener('mouseenter', () => showPopup(cardEl));
+  });
+
+  // Reposition popups on resize (they're absolutely positioned in the wrapper,
+  // so a layout change can leave them stranded)
+  window.addEventListener('resize', hidePopup);
+  // Also hide if the user scrolls away
+  window.addEventListener('scroll', hidePopup, { passive: true });
 }
 
 function escapeHtml(s) {
