@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mplify Deliverables Timeline · 2025–2027</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sansation:wght@300;400;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --mplify-navy:    #1f2c5c;
+    --mplify-orange:  #f08c1f;
+    --year-2025:      #2f6fd1;   /* blue band */
+    --year-2026:      #f08c1f;   /* orange band */
+    --year-2027:      #6b2a8a;   /* purple band */
+    --status-pub:     #1a8b3a;   /* Published */
+    --status-dev:     #f08c1f;   /* In Development */
+    --status-plan:    #2f6fd1;   /* Planned */
+    --status-area:    #9aa0a6;   /* Area / other */
+    --bg:             #f4f4f5;
+    --card-bg:        #ffffff;
+    --ink:            #1f2c5c;
+    --ink-soft:       #4a4a4a;
+    --hairline:       #e3e4e8;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Sansation', system-ui, sans-serif;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .page {
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 40px 56px 64px;
+  }
+
+  /* ---------- Header ---------- */
+  .pill {
+    display: inline-block;
+    background: var(--mplify-navy);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    font-size: 13px;
+    padding: 9px 22px;
+    border-radius: 999px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-family: 'Sansation', sans-serif;
+    font-weight: 700;
+    font-size: 44px;
+    color: var(--mplify-navy);
+    margin: 18px 0 24px;
+    letter-spacing: -0.01em;
+  }
+
+  .meta-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 56px;
+  }
+  .meta-card {
+    background: var(--card-bg);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 18px 22px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.02);
+  }
+  .meta-card .label {
+    color: var(--mplify-orange);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .meta-card .value {
+    color: var(--mplify-navy);
+    font-weight: 700;
+    font-size: 18px;
+  }
+
+  /* ---------- Loading / error ---------- */
+  .status-msg {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--ink-soft);
+    font-size: 15px;
+  }
+  .status-msg.err { color: #b00020; }
+
+  /* ---------- Timeline ---------- */
+  #chartWrap {
+    margin-top: 30px;
+  }
+  svg.timeline {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* SVG text styling */
+  .yr-label {
+    font-family: 'Sansation', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    fill: #fff;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .month-tick {
+    font-family: 'Sansation', sans-serif;
+    font-weight: 400;
+    font-size: 11px;
+    fill: var(--ink-soft);
+  }
+  .quarter-tick {
+    font-family: 'Sansation', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    fill: var(--mplify-navy);
+    letter-spacing: 0.08em;
+  }
+
+  /* Callout cards (foreignObject content) */
+  .callout {
+    background: #fff;
+    border: 1.5px solid var(--hairline);
+    border-radius: 8px;
+    padding: 9px 12px;
+    box-shadow: 0 2px 6px rgba(31,44,92,0.08);
+    font-family: 'Sansation', sans-serif;
+    line-height: 1.25;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .callout .name {
+    font-weight: 700;
+    font-size: 12.5px;
+    color: var(--mplify-navy);
+    word-break: break-word;
+  }
+  .callout .date {
+    font-weight: 400;
+    font-size: 10.5px;
+    color: var(--ink-soft);
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .callout.status-Published    { border-left: 4px solid var(--status-pub); }
+  .callout.status-InDevelopment{ border-left: 4px solid var(--status-dev); }
+  .callout.status-Planned      { border-left: 4px solid var(--status-plan); }
+  .callout.status-Area         { border-left: 4px solid var(--status-area); }
+  .callout.status-default      { border-left: 4px solid var(--mplify-navy); }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 30px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .legend .item { display: flex; align-items: center; gap: 8px; }
+  .legend .swatch {
+    width: 14px; height: 14px; border-radius: 50%;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0,0,0,0.06);
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 56px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+  }
+  footer a { color: var(--mplify-navy); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 900px) {
+    .page { padding: 24px 18px 40px; }
+    h1 { font-size: 30px; }
+    .meta-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <span class="pill">Roadmap</span>
+  <h1>Mplify Deliverables Timeline</h1>
+
+  <div class="meta-row">
+    <div class="meta-card">
+      <div class="label">Period</div>
+      <div class="value">January 2025 – December 2027</div>
+    </div>
+    <div class="meta-card">
+      <div class="label">Source</div>
+      <div class="value">Live from Mplify roadmap sheet</div>
+    </div>
+    <div class="meta-card">
+      <div class="label">Scope</div>
+      <div class="value">Items flagged for the public timeline</div>
+    </div>
+  </div>
+
+  <div id="chartWrap">
+    <div id="status" class="status-msg">Loading roadmap data…</div>
+    <svg id="timeline" class="timeline" style="display:none"></svg>
+  </div>
+
+  <div class="legend" id="legend" style="display:none">
+    <div class="item"><span class="swatch" style="background:var(--status-pub)"></span>Published</div>
+    <div class="item"><span class="swatch" style="background:var(--status-dev)"></span>In Development</div>
+    <div class="item"><span class="swatch" style="background:var(--status-plan)"></span>Planned</div>
+    <div class="item"><span class="swatch" style="background:var(--status-area)"></span>Area</div>
+  </div>
+
+  <footer>
+    Data fetched live from Google Sheets · <a id="srcLink" target="_blank" rel="noopener">Open source sheet</a>
+  </footer>
+</div>
+
+<!-- D3 v7 (used only for tiny CSV parser; we keep dependencies minimal) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const SHEET_ID  = '1XNiWZ6RqXgCI5jWVvK94CuvNQVt8mFlC84UD5-ZdFeY';
+const NODES_GID = '1203637575';
+
+// gviz CSV endpoint (works for any sheet shared "anyone with the link")
+const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${NODES_GID}`;
+
+document.getElementById('srcLink').href =
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit?gid=${NODES_GID}#gid=${NODES_GID}`;
+
+// Timeline window
+const T_START = new Date(2025, 0, 1);   // Jan 1, 2025
+const T_END   = new Date(2027, 11, 31); // Dec 31, 2027
+
+/* ============================================================
+   DATE PARSING
+   Accepts: "2025-03-15", "15/03/2025", "Mar 2025", "2025-Q2",
+            "Q2 2025", "March 2025", numeric dates, etc.
+   Returns Date or null.
+   ============================================================ */
+function parseFlexibleDate(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+
+  // ISO-ish: 2025-03-15 or 2025/03/15
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})(?:[-\/](\d{1,2}))?$/);
+  if (m) {
+    const y = +m[1], mo = +m[2] - 1, d = m[3] ? +m[3] : 15;
+    return new Date(y, mo, d);
+  }
+
+  // DD/MM/YYYY or D/M/YYYY
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+
+  // Quarter formats: 2025-Q2, Q2 2025, Q2/2025
+  m = s.match(/^(?:(\d{4})[-\s\/]?Q([1-4]))|(?:Q([1-4])[\s\/-]?(\d{4}))$/i);
+  if (m) {
+    const y = +(m[1] || m[4]);
+    const q = +(m[2] || m[3]);
+    // Place quarter at its midpoint month, 15th
+    const mo = (q - 1) * 3 + 1;
+    return new Date(y, mo, 15);
+  }
+
+  // Month name + year: "March 2025", "Mar 2025"
+  m = s.match(/^([A-Za-z]+)[\s\-,]+(\d{4})$/);
+  if (m) {
+    const monthIdx = monthFromName(m[1]);
+    if (monthIdx >= 0) return new Date(+m[2], monthIdx, 15);
+  }
+
+  // Year only: "2025"
+  m = s.match(/^(\d{4})$/);
+  if (m) return new Date(+m[1], 5, 30); // mid-year
+
+  // Final fallback: native Date parser
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function monthFromName(name) {
+  const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  const full   = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const n = name.toLowerCase();
+  let i = months.indexOf(n.slice(0,3));
+  if (i >= 0) return i;
+  i = full.indexOf(n);
+  return i;
+}
+
+/* ============================================================
+   STATUS NORMALIZATION (column D)
+   ============================================================ */
+function normalizeStatus(raw) {
+  if (!raw) return 'default';
+  const s = String(raw).trim().toLowerCase();
+  if (s.startsWith('publish'))   return 'Published';
+  if (s.startsWith('in dev'))    return 'InDevelopment';
+  if (s.startsWith('plan'))      return 'Planned';
+  if (s === 'area')              return 'Area';
+  return 'default';
+}
+
+/* ============================================================
+   FETCH + RENDER
+   ============================================================ */
+async function load() {
+  try {
+    const res = await fetch(CSV_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const rows = d3.csvParse(text);
+
+    // Identify columns case-insensitively. Expected: name, type, url, status, timeline, date
+    const cols = rows.columns.map(c => ({ raw: c, key: c.trim().toLowerCase() }));
+    const findCol = (target) => {
+      const hit = cols.find(c => c.key === target.toLowerCase());
+      return hit ? hit.raw : null;
+    };
+    const colName     = findCol('name')     || rows.columns[0];
+    const colStatus   = findCol('status');
+    const colTimeline = findCol('timeline');
+    const colDate     = findCol('date');
+
+    if (!colTimeline || !colDate) {
+      throw new Error("Couldn't find 'timeline' and/or 'date' columns in the sheet (expected columns F & G).");
+    }
+
+    // Filter: timeline === 'yes' (case-insensitive)
+    const items = rows
+      .map(r => ({
+        name:     (r[colName] || '').trim(),
+        status:   normalizeStatus(r[colStatus]),
+        flag:     (r[colTimeline] || '').trim().toLowerCase(),
+        rawDate:  (r[colDate] || '').trim(),
+      }))
+      .filter(r => r.flag === 'yes' && r.name)
+      .map(r => ({ ...r, date: parseFlexibleDate(r.rawDate) }))
+      .filter(r => r.date && r.date >= T_START && r.date <= T_END)
+      .sort((a, b) => a.date - b.date);
+
+    if (!items.length) {
+      document.getElementById('status').textContent =
+        "No deliverables flagged for the timeline (timeline = 'yes' with a parseable date in 2025–2027).";
+      return;
+    }
+
+    document.getElementById('status').style.display = 'none';
+    document.getElementById('timeline').style.display = 'block';
+    document.getElementById('legend').style.display = 'flex';
+
+    render(items);
+  } catch (err) {
+    console.error(err);
+    const s = document.getElementById('status');
+    s.classList.add('err');
+    s.textContent = `Error loading data: ${err.message}`;
+  }
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function render(items) {
+  const svg = document.getElementById('timeline');
+
+  // Layout constants
+  const W           = 1480;
+  const margin      = { top: 200, right: 80, bottom: 200, left: 80 };
+  const innerW      = W - margin.left - margin.right;
+  const barY        = margin.top;
+  const barH        = 44;
+  const arrowW      = 26;            // tip overhang past the right edge
+  const cardW       = 168;
+  const cardH       = 52;
+  const cardGapV    = 18;            // gap between bar and card
+  const dotR        = 7;
+
+  // Time scale
+  const totalMs = T_END - T_START;
+  const xOf = (d) => margin.left + ((d - T_START) / totalMs) * innerW;
+
+  // Year segment boundaries
+  const yearBands = [
+    { y: 2025, color: 'var(--year-2025)' },
+    { y: 2026, color: 'var(--year-2026)' },
+    { y: 2027, color: 'var(--year-2027)' },
+  ];
+
+  /* ---------- Collision-avoidance: alternate above/below ----------
+     Items are sorted by date. We assign sides alternately, but if
+     two adjacent items on the SAME side are too close horizontally,
+     we flip the second one. We also nudge cards vertically in tiers
+     when they still overlap on the same side.
+  */
+  const placed = items.map((item, i) => {
+    const x = xOf(item.date);
+    return { ...item, x, side: i % 2 === 0 ? 'top' : 'bottom', tier: 0 };
+  });
+
+  // Resolve same-side horizontal overlaps by stacking tiers
+  const minHorizGap = cardW + 12;
+  ['top', 'bottom'].forEach(side => {
+    const onSide = placed.filter(p => p.side === side);
+    onSide.forEach((p, idx) => {
+      let tier = 0;
+      // Walk back through earlier items on same side; bump tier if too close
+      for (let j = idx - 1; j >= 0; j--) {
+        const prev = onSide[j];
+        if (Math.abs(p.x - prev.x) < minHorizGap && prev.tier === tier) {
+          tier = prev.tier + 1;
+        } else if (Math.abs(p.x - prev.x) >= minHorizGap) {
+          break;
+        }
+      }
+      p.tier = tier;
+    });
+  });
+
+  const tierStep = cardH + 14;
+  const maxTopTier = Math.max(0, ...placed.filter(p => p.side === 'top').map(p => p.tier));
+  const maxBotTier = Math.max(0, ...placed.filter(p => p.side === 'bottom').map(p => p.tier));
+
+  // Total SVG height adjusts to tiers used
+  const H = margin.top + barH + margin.bottom
+          + maxTopTier * tierStep
+          + maxBotTier * tierStep;
+
+  // Recompute the bar Y so cards have room above
+  const computedBarY = margin.top + maxTopTier * tierStep;
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+  // Build SVG markup
+  const parts = [];
+
+  /* ---------- Year bands + arrow ---------- */
+  // Band x-ranges
+  const bandRanges = yearBands.map(b => {
+    const s = new Date(b.y, 0, 1);
+    const e = new Date(b.y, 11, 31);
+    return {
+      year: b.y,
+      color: b.color,
+      x0: xOf(s < T_START ? T_START : s),
+      x1: xOf(e > T_END ? T_END : e),
+    };
+  });
+
+  // Arrow tip path on the very last band
+  const last = bandRanges[bandRanges.length - 1];
+  bandRanges.forEach((b, i) => {
+    const isLast = i === bandRanges.length - 1;
+    if (isLast) {
+      // Path: rect with right-side triangle tip
+      const x0 = b.x0, y0 = computedBarY;
+      const x1 = b.x1, y1 = computedBarY + barH;
+      const tipX = x1 + arrowW;
+      const midY = (y0 + y1) / 2;
+      parts.push(
+        `<path d="M${x0},${y0} L${x1},${y0} L${tipX},${midY} L${x1},${y1} L${x0},${y1} Z"
+               fill="${b.color}" />`
+      );
+    } else {
+      parts.push(
+        `<rect x="${b.x0}" y="${computedBarY}" width="${b.x1 - b.x0}" height="${barH}"
+               fill="${b.color}" />`
+      );
+    }
+  });
+
+  // Year labels centered on each band
+  bandRanges.forEach(b => {
+    const cx = (b.x0 + b.x1) / 2;
+    const cy = computedBarY + barH / 2 + 5;
+    parts.push(
+      `<text class="yr-label" x="${cx}" y="${cy}" text-anchor="middle">${b.year}</text>`
+    );
+  });
+
+  /* ---------- Quarter tick marks below the bar ---------- */
+  const quarterY = computedBarY + barH + 22;
+  for (let y = 2025; y <= 2027; y++) {
+    for (let q = 1; q <= 4; q++) {
+      const tickDate = new Date(y, (q - 1) * 3, 1);
+      if (tickDate < T_START || tickDate > T_END) continue;
+      const tx = xOf(tickDate);
+      parts.push(
+        `<line x1="${tx}" y1="${computedBarY + barH}" x2="${tx}" y2="${computedBarY + barH + 8}"
+               stroke="#bdbec3" stroke-width="1" />`,
+        `<text class="quarter-tick" x="${tx}" y="${quarterY}" text-anchor="middle">Q${q}</text>`
+      );
+    }
+  }
+
+  /* ---------- Markers + connectors + callout cards ---------- */
+  const statusColorMap = {
+    Published:     'var(--status-pub)',
+    InDevelopment: 'var(--status-dev)',
+    Planned:       'var(--status-plan)',
+    Area:          'var(--status-area)',
+    default:       'var(--mplify-navy)',
+  };
+
+  const dateLabel = (d) => {
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${monthShort[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
+  placed.forEach(p => {
+    const cx = p.x;
+    const cyBar = computedBarY + barH / 2;
+    const dotColor = statusColorMap[p.status] || statusColorMap.default;
+
+    // Determine card Y (top side stacks UPWARD, bottom side stacks DOWNWARD)
+    let cardY, lineY1, lineY2;
+    if (p.side === 'top') {
+      lineY1 = computedBarY;
+      cardY  = computedBarY - cardGapV - cardH - p.tier * tierStep;
+      lineY2 = cardY + cardH;
+    } else {
+      lineY1 = computedBarY + barH;
+      cardY  = computedBarY + barH + cardGapV + 22 /* quarters */ + p.tier * tierStep;
+      lineY2 = cardY;
+    }
+
+    // Connector line
+    parts.push(
+      `<line x1="${cx}" y1="${lineY1}" x2="${cx}" y2="${lineY2}"
+             stroke="#9aa0a6" stroke-width="1.5" stroke-dasharray="3,3" />`
+    );
+
+    // Marker dot (white halo + colored fill)
+    parts.push(
+      `<circle cx="${cx}" cy="${cyBar}" r="${dotR + 3}" fill="#fff" />`,
+      `<circle cx="${cx}" cy="${cyBar}" r="${dotR}" fill="${dotColor}" />`
+    );
+
+    // Callout card via foreignObject (to use HTML/CSS for clean text wrapping)
+    const cardX = Math.max(margin.left - 20, Math.min(W - margin.right - cardW + 20, cx - cardW / 2));
+    const safeName = escapeHtml(p.name);
+    const safeDate = escapeHtml(dateLabel(p.date));
+    parts.push(`
+      <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${cardH}">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="callout status-${p.status}">
+          <div class="name">${safeName}</div>
+          <div class="date">${safeDate}</div>
+        </div>
+      </foreignObject>
+    `);
+  });
+
+  svg.innerHTML = parts.join('\n');
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+/* ============================================================
+   GO
+   ============================================================ */
+load();
+</script>
+</body>
+</html>
