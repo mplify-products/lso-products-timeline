@@ -194,9 +194,18 @@ function parseFlexibleDate(raw) {
     return new Date(y, mo, d);
   }
 
-  // DD/MM/YYYY or D/M/YYYY
+  // Slash dates: M/D/YYYY (US/Google Sheets default) or D/M/YYYY (European)
+  // Auto-detect: if either field is > 12, the other must be the month.
+  // If both are <= 12, default to M/D/YYYY (the dominant Sheets export format).
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  if (m) {
+    const a = +m[1], b = +m[2], y = +m[3];
+    let month, day;
+    if (a > 12 && b <= 12)      { day = a; month = b; }      // clearly D/M/YYYY
+    else if (b > 12 && a <= 12) { month = a; day = b; }      // clearly M/D/YYYY
+    else                        { month = a; day = b; }      // ambiguous → assume M/D/YYYY
+    return new Date(y, month - 1, day);
+  }
 
   // Quarter formats: 2025-Q2, Q2 2025, Q2/2025
   m = s.match(/^(?:(\d{4})[-\s\/]?Q([1-4]))|(?:Q([1-4])[\s\/-]?(\d{4}))$/i);
