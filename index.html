@@ -114,13 +114,12 @@
   }
 
   /* SVG text styling */
-  .yr-label {
+  .yr-label-above {
     font-family: 'Sansation', sans-serif;
     font-weight: 700;
-    font-size: 14px;
-    fill: #fff;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    font-size: 18px;
+    fill: var(--mplify-navy);
+    letter-spacing: 0.16em;
   }
   .month-tick {
     font-family: 'Sansation', sans-serif;
@@ -144,13 +143,9 @@
     padding: 9px 12px;
     box-shadow: 0 2px 6px rgba(31,44,92,0.08);
     font-family: 'Sansation', sans-serif;
-    line-height: 1.25;
+    line-height: 1.3;
     width: 100%;
-    height: 100%;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    box-sizing: border-box;
   }
   .callout .name {
     font-weight: 700;
@@ -211,22 +206,7 @@
 <div class="page">
 
   <span class="pill">Roadmap</span>
-  <h1>Mplify Deliverables Timeline</h1>
-
-  <div class="meta-row">
-    <div class="meta-card">
-      <div class="label">Period</div>
-      <div class="value">January 2025 – December 2027</div>
-    </div>
-    <div class="meta-card">
-      <div class="label">Source</div>
-      <div class="value">Live from Mplify roadmap sheet</div>
-    </div>
-    <div class="meta-card">
-      <div class="label">Scope</div>
-      <div class="value">Items flagged for the public timeline</div>
-    </div>
-  </div>
+  <h1>LSO Products Deliverables Timeline</h1>
 
   <div id="chartWrap">
     <div id="status" class="status-msg">Loading roadmap data…</div>
@@ -239,10 +219,6 @@
     <div class="item"><span class="swatch" style="background:var(--status-plan)"></span>Planned</div>
     <div class="item"><span class="swatch" style="background:var(--status-area)"></span>Area</div>
   </div>
-
-  <footer>
-    Data fetched live from Google Sheets · <a id="srcLink" target="_blank" rel="noopener">Open source sheet</a>
-  </footer>
 </div>
 
 <!-- D3 v7 (used only for tiny CSV parser; we keep dependencies minimal) -->
@@ -257,9 +233,6 @@ const NODES_GID = '1203637575';
 
 // gviz CSV endpoint (works for any sheet shared "anyone with the link")
 const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${NODES_GID}`;
-
-document.getElementById('srcLink').href =
-  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit?gid=${NODES_GID}#gid=${NODES_GID}`;
 
 // Timeline window
 const T_START = new Date(2025, 0, 1);   // Jan 1, 2025
@@ -407,16 +380,17 @@ function render(items) {
   const svg = document.getElementById('timeline');
 
   // Layout constants
-  const W           = 1480;
-  const margin      = { top: 200, right: 80, bottom: 200, left: 80 };
+  const W           = 1760;            // wider so dots near year-band centers don't crowd labels
+  const margin      = { top: 200, right: 90, bottom: 220, left: 90 };
   const innerW      = W - margin.left - margin.right;
   const barY        = margin.top;
   const barH        = 44;
-  const arrowW      = 26;            // tip overhang past the right edge
-  const cardW       = 168;
-  const cardH       = 52;
-  const cardGapV    = 18;            // gap between bar and card
+  const arrowW      = 28;              // tip overhang past the right edge
+  const cardW       = 184;
+  const cardMinH    = 46;              // minimum card height (1-line label + date)
+  const cardGapV    = 22;              // gap between bar and nearest card edge
   const dotR        = 7;
+  const yearLabelGap = 6;              // gap between year-label band and the colored bar
 
   // Time scale
   const totalMs = T_END - T_START;
@@ -429,24 +403,55 @@ function render(items) {
     { y: 2027, color: 'var(--year-2027)' },
   ];
 
-  /* ---------- Collision-avoidance: alternate above/below ----------
-     Items are sorted by date. We assign sides alternately, but if
-     two adjacent items on the SAME side are too close horizontally,
-     we flip the second one. We also nudge cards vertically in tiers
-     when they still overlap on the same side.
+  /* ---------- Per-card height measurement ----------
+     Render each label off-screen to figure out how tall its card needs to be,
+     so long names ("Carrier Ethernet over Broadband Service Definitions")
+     don't get clipped while short ones ("Mplify 101") don't waste space.
   */
+  const measurer = document.createElement('div');
+  measurer.style.cssText =
+    'position:absolute;visibility:hidden;pointer-events:none;' +
+    `width:${cardW}px;left:-9999px;top:0;`;
+  document.body.appendChild(measurer);
+
+  const measureCardHeight = (labelHtml, dateHtml, statusClass) => {
+    measurer.innerHTML = `
+      <div class="callout status-${statusClass}" style="height:auto">
+        <div class="name">${labelHtml}</div>
+        <div class="date">${dateHtml}</div>
+      </div>`;
+    const h = measurer.firstElementChild.getBoundingClientRect().height;
+    return Math.max(cardMinH, Math.ceil(h) + 2);
+  };
+
+  const dateLabel = (d) => {
+    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${monthShort[d.getMonth()]} ${d.getFullYear()}`;
+  };
+
+  /* ---------- Collision-avoidance: alternate above/below ---------- */
   const placed = items.map((item, i) => {
     const x = xOf(item.date);
     return { ...item, x, side: i % 2 === 0 ? 'top' : 'bottom', tier: 0 };
   });
 
+  // Measure each card now (needed for tier-stacking math)
+  placed.forEach(p => {
+    const safeName = escapeHtml(p.label);
+    const safeDate = escapeHtml(dateLabel(p.date));
+    p._safeName = safeName;
+    p._safeDate = safeDate;
+    p.cardH = measureCardHeight(safeName, safeDate, p.status);
+  });
+
+  document.body.removeChild(measurer);
+
   // Resolve same-side horizontal overlaps by stacking tiers
-  const minHorizGap = cardW + 12;
+  const minHorizGap = cardW + 14;
   ['top', 'bottom'].forEach(side => {
     const onSide = placed.filter(p => p.side === side);
     onSide.forEach((p, idx) => {
       let tier = 0;
-      // Walk back through earlier items on same side; bump tier if too close
       for (let j = idx - 1; j >= 0; j--) {
         const prev = onSide[j];
         if (Math.abs(p.x - prev.x) < minHorizGap && prev.tier === tier) {
@@ -459,26 +464,40 @@ function render(items) {
     });
   });
 
-  const tierStep = cardH + 14;
-  const maxTopTier = Math.max(0, ...placed.filter(p => p.side === 'top').map(p => p.tier));
-  const maxBotTier = Math.max(0, ...placed.filter(p => p.side === 'bottom').map(p => p.tier));
+  // Tier offset is driven by the tallest card in that tier on that side
+  const tierGap = 14;
+  const sideTierHeights = { top: {}, bottom: {} };
+  ['top', 'bottom'].forEach(side => {
+    placed.filter(p => p.side === side).forEach(p => {
+      sideTierHeights[side][p.tier] =
+        Math.max(sideTierHeights[side][p.tier] || 0, p.cardH);
+    });
+  });
+  const cumulativeOffset = (side, tier) => {
+    let off = 0;
+    for (let t = 0; t < tier; t++) {
+      off += (sideTierHeights[side][t] || 0) + tierGap;
+    }
+    return off;
+  };
 
-  // Total SVG height adjusts to tiers used
-  const H = margin.top + barH + margin.bottom
-          + maxTopTier * tierStep
-          + maxBotTier * tierStep;
+  const topStackHeight = Object.values(sideTierHeights.top).reduce(
+    (a, h) => a + h + tierGap, 0);
+  const botStackHeight = Object.values(sideTierHeights.bottom).reduce(
+    (a, h) => a + h + tierGap, 0);
 
-  // Recompute the bar Y so cards have room above
-  const computedBarY = margin.top + maxTopTier * tierStep;
+  // Bar Y leaves room above for the top stack
+  const computedBarY = margin.top + topStackHeight;
+
+  // Total SVG height
+  const H = computedBarY + barH + 30 /* quarter ticks */ + botStackHeight + 30;
 
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
 
-  // Build SVG markup
   const parts = [];
 
-  /* ---------- Year bands + arrow ---------- */
-  // Band x-ranges
+  /* ---------- Year band x-ranges ---------- */
   const bandRanges = yearBands.map(b => {
     const s = new Date(b.y, 0, 1);
     const e = new Date(b.y, 11, 31);
@@ -490,12 +509,19 @@ function render(items) {
     };
   });
 
-  // Arrow tip path on the very last band
-  const last = bandRanges[bandRanges.length - 1];
+  // Year LABELS above the bar (so dots can never overlap them)
+  bandRanges.forEach(b => {
+    const cx = (b.x0 + b.x1) / 2;
+    const labelY = computedBarY - yearLabelGap;
+    parts.push(
+      `<text class="yr-label-above" x="${cx}" y="${labelY}" text-anchor="middle">${b.year}</text>`
+    );
+  });
+
+  // Colored bar with arrow on last segment
   bandRanges.forEach((b, i) => {
     const isLast = i === bandRanges.length - 1;
     if (isLast) {
-      // Path: rect with right-side triangle tip
       const x0 = b.x0, y0 = computedBarY;
       const x1 = b.x1, y1 = computedBarY + barH;
       const tipX = x1 + arrowW;
@@ -510,15 +536,6 @@ function render(items) {
                fill="${b.color}" />`
       );
     }
-  });
-
-  // Year labels centered on each band
-  bandRanges.forEach(b => {
-    const cx = (b.x0 + b.x1) / 2;
-    const cy = computedBarY + barH / 2 + 5;
-    parts.push(
-      `<text class="yr-label" x="${cx}" y="${cy}" text-anchor="middle">${b.year}</text>`
-    );
   });
 
   /* ---------- Quarter tick marks below the bar ---------- */
@@ -545,25 +562,20 @@ function render(items) {
     default:       'var(--mplify-navy)',
   };
 
-  const dateLabel = (d) => {
-    const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return `${monthShort[d.getMonth()]} ${d.getFullYear()}`;
-  };
-
   placed.forEach(p => {
     const cx = p.x;
     const cyBar = computedBarY + barH / 2;
     const dotColor = statusColorMap[p.status] || statusColorMap.default;
 
-    // Determine card Y (top side stacks UPWARD, bottom side stacks DOWNWARD)
     let cardY, lineY1, lineY2;
+    const tierOff = cumulativeOffset(p.side, p.tier);
     if (p.side === 'top') {
       lineY1 = computedBarY;
-      cardY  = computedBarY - cardGapV - cardH - p.tier * tierStep;
-      lineY2 = cardY + cardH;
+      cardY  = computedBarY - cardGapV - p.cardH - tierOff;
+      lineY2 = cardY + p.cardH;
     } else {
       lineY1 = computedBarY + barH;
-      cardY  = computedBarY + barH + cardGapV + 22 /* quarters */ + p.tier * tierStep;
+      cardY  = computedBarY + barH + cardGapV + 22 + tierOff;
       lineY2 = cardY;
     }
 
@@ -579,15 +591,13 @@ function render(items) {
       `<circle cx="${cx}" cy="${cyBar}" r="${dotR}" fill="${dotColor}" />`
     );
 
-    // Callout card via foreignObject (to use HTML/CSS for clean text wrapping)
-    const cardX = Math.max(margin.left - 20, Math.min(W - margin.right - cardW + 20, cx - cardW / 2));
-    const safeName = escapeHtml(p.label);
-    const safeDate = escapeHtml(dateLabel(p.date));
+    // Callout card sized to its measured height
+    const cardX = Math.max(margin.left - 30, Math.min(W - margin.right - cardW + 30, cx - cardW / 2));
     parts.push(`
-      <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${cardH}">
+      <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${p.cardH}">
         <div xmlns="http://www.w3.org/1999/xhtml" class="callout status-${p.status}">
-          <div class="name">${safeName}</div>
-          <div class="date">${safeDate}</div>
+          <div class="name">${p._safeName}</div>
+          <div class="date">${p._safeDate}</div>
         </div>
       </foreignObject>
     `);
