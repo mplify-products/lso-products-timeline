@@ -205,19 +205,12 @@
 
 <div class="page">
 
-  <span class="pill">Roadmap</span>
-  <h1>LSO Products Deliverables Timeline</h1>
+  <span class="pill">Timeline</span>
+  <h1>LSO Products and Services</h1>
 
   <div id="chartWrap">
     <div id="status" class="status-msg">Loading roadmap data…</div>
     <svg id="timeline" class="timeline" style="display:none"></svg>
-  </div>
-
-  <div class="legend" id="legend" style="display:none">
-    <div class="item"><span class="swatch" style="background:var(--status-pub)"></span>Published</div>
-    <div class="item"><span class="swatch" style="background:var(--status-dev)"></span>In Development</div>
-    <div class="item"><span class="swatch" style="background:var(--status-plan)"></span>Planned</div>
-    <div class="item"><span class="swatch" style="background:var(--status-area)"></span>Area</div>
   </div>
 </div>
 
@@ -362,7 +355,6 @@ async function load() {
 
     document.getElementById('status').style.display = 'none';
     document.getElementById('timeline').style.display = 'block';
-    document.getElementById('legend').style.display = 'flex';
 
     render(items);
   } catch (err) {
