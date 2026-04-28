@@ -352,24 +352,31 @@ async function load() {
       const hit = cols.find(c => c.key === target.toLowerCase());
       return hit ? hit.raw : null;
     };
-    const colName     = findCol('name')     || rows.columns[0];
-    const colStatus   = findCol('status');
-    const colTimeline = findCol('timeline');
-    const colDate     = findCol('date');
+    const colName        = findCol('name')          || rows.columns[0];
+    const colStatus      = findCol('status');
+    const colTimeline    = findCol('timeline');
+    const colDate        = findCol('date');
+    const colTimelineLbl = findCol('timeline-info'); // column H — preferred label
 
     if (!colTimeline || !colDate) {
       throw new Error("Couldn't find 'timeline' and/or 'date' columns in the sheet (expected columns F & G).");
     }
 
     // Filter: timeline === 'yes' (case-insensitive)
+    // Label preference: timeline-info (col H) → name (col A) as fallback
     const items = rows
-      .map(r => ({
-        name:     (r[colName] || '').trim(),
-        status:   normalizeStatus(r[colStatus]),
-        flag:     (r[colTimeline] || '').trim().toLowerCase(),
-        rawDate:  (r[colDate] || '').trim(),
-      }))
-      .filter(r => r.flag === 'yes' && r.name)
+      .map(r => {
+        const tlInfo = colTimelineLbl ? (r[colTimelineLbl] || '').trim() : '';
+        const name   = (r[colName] || '').trim();
+        return {
+          name,                                  // kept for fallback / debugging
+          label:    tlInfo || name,              // what gets rendered on the timeline
+          status:   normalizeStatus(r[colStatus]),
+          flag:     (r[colTimeline] || '').trim().toLowerCase(),
+          rawDate:  (r[colDate] || '').trim(),
+        };
+      })
+      .filter(r => r.flag === 'yes' && r.label)
       .map(r => ({ ...r, date: parseFlexibleDate(r.rawDate) }))
       .filter(r => r.date && r.date >= T_START && r.date <= T_END)
       .sort((a, b) => a.date - b.date);
@@ -574,7 +581,7 @@ function render(items) {
 
     // Callout card via foreignObject (to use HTML/CSS for clean text wrapping)
     const cardX = Math.max(margin.left - 20, Math.min(W - margin.right - cardW + 20, cx - cardW / 2));
-    const safeName = escapeHtml(p.name);
+    const safeName = escapeHtml(p.label);
     const safeDate = escapeHtml(dateLabel(p.date));
     parts.push(`
       <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${cardH}">
