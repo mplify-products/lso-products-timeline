@@ -114,12 +114,12 @@
   }
 
   /* SVG text styling */
-  .yr-label-above {
+  .yr-label-inside {
     font-family: 'Sansation', sans-serif;
     font-weight: 700;
-    font-size: 18px;
-    fill: var(--mplify-navy);
-    letter-spacing: 0.16em;
+    font-size: 22px;
+    fill: #fff;
+    letter-spacing: 0.18em;
   }
   .month-tick {
     font-family: 'Sansation', sans-serif;
@@ -380,17 +380,17 @@ function render(items) {
   const svg = document.getElementById('timeline');
 
   // Layout constants
-  const W           = 1760;            // wider so dots near year-band centers don't crowd labels
+  const W           = 1760;
   const margin      = { top: 200, right: 90, bottom: 220, left: 90 };
   const innerW      = W - margin.left - margin.right;
   const barY        = margin.top;
-  const barH        = 44;
-  const arrowW      = 28;              // tip overhang past the right edge
+  const barH        = 80;              // taller bar so year labels fit inside it
+  const arrowW      = 50;              // arrow tip scales with bar height
   const cardW       = 184;
-  const cardMinH    = 46;              // minimum card height (1-line label + date)
-  const cardGapV    = 22;              // gap between bar and nearest card edge
+  const cardMinH    = 46;
+  const cardGapV    = 22;              // gap between bar edge and nearest card edge
   const dotR        = 7;
-  const yearLabelGap = 6;              // gap between year-label band and the colored bar
+  const dotInset    = 14;              // how far inside the bar edge each dot sits
 
   // Time scale
   const totalMs = T_END - T_START;
@@ -509,15 +509,6 @@ function render(items) {
     };
   });
 
-  // Year LABELS above the bar (so dots can never overlap them)
-  bandRanges.forEach(b => {
-    const cx = (b.x0 + b.x1) / 2;
-    const labelY = computedBarY - yearLabelGap;
-    parts.push(
-      `<text class="yr-label-above" x="${cx}" y="${labelY}" text-anchor="middle">${b.year}</text>`
-    );
-  });
-
   // Colored bar with arrow on last segment
   bandRanges.forEach((b, i) => {
     const isLast = i === bandRanges.length - 1;
@@ -536,6 +527,15 @@ function render(items) {
                fill="${b.color}" />`
       );
     }
+  });
+
+  // Year LABELS centered inside the bar (white on color)
+  bandRanges.forEach(b => {
+    const cx = (b.x0 + b.x1) / 2;
+    const labelY = computedBarY + barH / 2 + 7; // optical centering for the font
+    parts.push(
+      `<text class="yr-label-inside" x="${cx}" y="${labelY}" text-anchor="middle">${b.year}</text>`
+    );
   });
 
   /* ---------- Quarter tick marks below the bar ---------- */
@@ -564,7 +564,10 @@ function render(items) {
 
   placed.forEach(p => {
     const cx = p.x;
-    const cyBar = computedBarY + barH / 2;
+    // Dot Y depends on side: top side → near top edge of bar; bottom side → near bottom edge
+    const cyDot = p.side === 'top'
+      ? computedBarY + dotInset
+      : computedBarY + barH - dotInset;
     const dotColor = statusColorMap[p.status] || statusColorMap.default;
 
     let cardY, lineY1, lineY2;
@@ -585,10 +588,10 @@ function render(items) {
              stroke="#9aa0a6" stroke-width="1.5" stroke-dasharray="3,3" />`
     );
 
-    // Marker dot (white halo + colored fill)
+    // Marker dot (white halo + colored fill) — sits inside the bar near its edge
     parts.push(
-      `<circle cx="${cx}" cy="${cyBar}" r="${dotR + 3}" fill="#fff" />`,
-      `<circle cx="${cx}" cy="${cyBar}" r="${dotR}" fill="${dotColor}" />`
+      `<circle cx="${cx}" cy="${cyDot}" r="${dotR + 3}" fill="#fff" />`,
+      `<circle cx="${cx}" cy="${cyDot}" r="${dotR}" fill="${dotColor}" />`
     );
 
     // Callout card sized to its measured height
