@@ -361,9 +361,17 @@ function render(items) {
     return Math.max(cardMinH, Math.ceil(h) + 2);
   };
 
+  const today = new Date();
+
   const dateLabel = (d) => {
     const monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return `${monthShort[d.getMonth()]} ${d.getFullYear()}`;
+    const formatted = `${monthShort[d.getMonth()]} ${d.getFullYear()}`;
+    // Treat a month-precision date as "future" until we're past the END of its month.
+    // (The parser puts month/year-only dates on the 15th, so a same-month item
+    // would otherwise flicker between past/future depending on the day.)
+    const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const isFuture = endOfMonth >= today;
+    return isFuture ? `ETA: ${formatted}` : formatted;
   };
 
   /* ---------- Collision-avoidance: alternate above/below ---------- */
