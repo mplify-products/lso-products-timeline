@@ -398,6 +398,15 @@ function render(items) {
     p.cardH = measureCardHeight(safeName, safeDate, p.status);
   });
 
+  // ---- DEBUG: prove ETA logic is running with the live data ----
+  console.log('%c[Timeline ETA debug] Today:', 'color:#1f5fbf;font-weight:bold', today.toISOString().slice(0,10));
+  console.table(placed.map(p => ({
+    label: p.label.slice(0, 40),
+    rawDate: p.rawDate,
+    parsed: p.date.toISOString().slice(0,10),
+    rendered: p._safeDate,
+  })));
+
   document.body.removeChild(measurer);
 
   // Resolve same-side horizontal overlaps by stacking tiers
