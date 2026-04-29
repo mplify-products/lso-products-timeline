@@ -564,7 +564,13 @@ function render(items) {
     }
   }
 
-  /* ---------- Markers + connectors + callout cards ---------- */
+  /* ---------- Markers + connectors + callout cards ----------
+     Three painting passes so z-order is correct:
+       1. All connector lines (back)
+       2. All marker dots
+       3. All callout cards (front) — guarantees no other card's
+          connector can ever cross over the front of a card.
+  */
   const statusColorMap = {
     Published:     'var(--status-pub)',
     InDevelopment: 'var(--status-dev)',
@@ -573,16 +579,14 @@ function render(items) {
     default:       'var(--mplify-navy)',
   };
 
-  placed.forEach(p => {
+  // Compute geometry per item once, reuse across the three passes
+  const geom = placed.map(p => {
     const cx = p.x;
-    // Dot Y depends on side: top side → near top edge of bar; bottom side → near bottom edge
     const cyDot = p.side === 'top'
       ? computedBarY + dotInset
       : computedBarY + barH - dotInset;
-    const dotColor = statusColorMap[p.status] || statusColorMap.default;
-
-    let cardY, lineY1, lineY2;
     const tierOff = cumulativeOffset(p.side, p.tier);
+    let cardY, lineY1, lineY2;
     if (p.side === 'top') {
       lineY1 = computedBarY;
       cardY  = computedBarY - cardGapV - p.cardH - tierOff;
@@ -592,21 +596,29 @@ function render(items) {
       cardY  = computedBarY + barH + cardGapV + 22 + tierOff;
       lineY2 = cardY;
     }
+    const cardX = Math.max(margin.left - 30, Math.min(W - margin.right - cardW + 30, cx - cardW / 2));
+    return { p, cx, cyDot, cardY, cardX, lineY1, lineY2 };
+  });
 
-    // Connector line
+  // Pass 1 — connector lines (drawn first → behind everything else)
+  geom.forEach(({ cx, lineY1, lineY2 }) => {
     parts.push(
       `<line x1="${cx}" y1="${lineY1}" x2="${cx}" y2="${lineY2}"
              stroke="#9aa0a6" stroke-width="1.5" stroke-dasharray="3,3" />`
     );
+  });
 
-    // Marker dot (white halo + colored fill) — sits inside the bar near its edge
+  // Pass 2 — marker dots (over the lines, but under the cards)
+  geom.forEach(({ p, cx, cyDot }) => {
+    const dotColor = statusColorMap[p.status] || statusColorMap.default;
     parts.push(
       `<circle cx="${cx}" cy="${cyDot}" r="${dotR + 3}" fill="#fff" />`,
       `<circle cx="${cx}" cy="${cyDot}" r="${dotR}" fill="${dotColor}" />`
     );
+  });
 
-    // Callout card sized to its measured height
-    const cardX = Math.max(margin.left - 30, Math.min(W - margin.right - cardW + 30, cx - cardW / 2));
+  // Pass 3 — callout cards (drawn last → on top of any line)
+  geom.forEach(({ p, cardX, cardY }) => {
     parts.push(`
       <foreignObject x="${cardX}" y="${cardY}" width="${cardW}" height="${p.cardH}">
         <div xmlns="http://www.w3.org/1999/xhtml" class="callout status-${p.status}" data-card-id="${p._cardId}">
